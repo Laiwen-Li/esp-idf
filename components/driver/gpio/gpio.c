@@ -627,9 +627,8 @@ esp_err_t gpio_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type)
 {
     GPIO_CHECK(GPIO_IS_VALID_GPIO(gpio_num), "GPIO number error", ESP_ERR_INVALID_ARG);
     esp_err_t ret = ESP_OK;
-#if !IDF_TARGET_ESP32C6
+
     if ((intr_type == GPIO_INTR_LOW_LEVEL) || (intr_type == GPIO_INTR_HIGH_LEVEL)) {
-#endif
 #if SOC_RTCIO_WAKE_SUPPORTED
         if (rtc_gpio_is_valid_gpio(gpio_num)) {
             ret = rtc_gpio_wakeup_enable(gpio_num, intr_type);
@@ -642,13 +641,10 @@ esp_err_t gpio_wakeup_enable(gpio_num_t gpio_num, gpio_int_type_t intr_type)
         gpio_hal_sleep_sel_dis(gpio_context.gpio_hal, gpio_num);
 #endif
         portEXIT_CRITICAL(&gpio_context.gpio_spinlock);
-#if !IDF_TARGET_ESP32C6
     } else {
         ESP_LOGE(GPIO_TAG, "GPIO wakeup only supports level mode, but edge mode set. gpio_num:%u", gpio_num);
         ret = ESP_ERR_INVALID_ARG;
     }
-#endif
-
     return ret;
 }
 

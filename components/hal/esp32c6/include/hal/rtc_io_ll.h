@@ -300,6 +300,16 @@ static inline void rtcio_ll_wakeup_disable(int rtcio_num)
 }
 
 /**
+ * Clear the RTC IO edge-triggered wake-up interrupt status.
+ *
+ * @param rtcio_num The index of rtcio. 0 ~ MAX(rtcio).
+ */
+static inline void rtcio_ll_clear_edge_wakeup_intr_status(int rtcio_num)
+{
+    LP_IO.pin[rtcio_num].edge_wakeup_clr = 1;
+}
+
+/**
  * Enable rtc io output in deep sleep.
  *
  * @param rtcio_num The index of rtcio. 0 ~ MAX(rtcio).

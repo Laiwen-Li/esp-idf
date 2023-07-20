@@ -258,6 +258,9 @@ static void touch_wakeup_prepare(void);
 #if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
 static void gpio_deep_sleep_wakeup_prepare(void);
 #endif
+#if SOC_RTCIO_EDGE_WAKE_SUPPORTED
+static void gpio_light_sleep_wakeup_prepare(void);
+#endif
 
 #if SOC_RTC_FAST_MEM_SUPPORTED
 #if SOC_PM_SUPPORT_DEEPSLEEP_CHECK_STUB_ONLY
@@ -604,6 +607,7 @@ static esp_err_t IRAM_ATTR esp_sleep_start(uint32_t pd_flags, esp_sleep_mode_t m
     if (deep_sleep) {
         flush_uarts();
     } else {
+        flush_uarts();
         should_skip_sleep = light_sleep_uart_prepare(pd_flags, sleep_duration);
     }
 
@@ -627,11 +631,17 @@ static esp_err_t IRAM_ATTR esp_sleep_start(uint32_t pd_flags, esp_sleep_mode_t m
     }
 #endif
 
+    if (s_config.wakeup_triggers & RTC_GPIO_TRIG_EN) {
+        if (deep_sleep) {
 #if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
-    if (deep_sleep && (s_config.wakeup_triggers & RTC_GPIO_TRIG_EN)) {
-        gpio_deep_sleep_wakeup_prepare();
-    }
+            gpio_deep_sleep_wakeup_prepare();
 #endif
+        } else {
+#if SOC_RTCIO_EDGE_WAKE_SUPPORTED
+            gpio_light_sleep_wakeup_prepare();
+#endif
+        }
+    }
 
 #if CONFIG_ULP_COPROC_TYPE_FSM
     // Enable ULP wakeup
@@ -1574,6 +1584,17 @@ esp_err_t esp_deep_sleep_enable_gpio_wakeup(uint64_t gpio_pin_mask, esp_deepslee
 }
 
 #endif //SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
+
+#if SOC_RTCIO_EDGE_WAKE_SUPPORTED
+static void gpio_light_sleep_wakeup_prepare(void)
+{
+    for (gpio_num_t gpio = GPIO_NUM_0; gpio < GPIO_NUM_MAX; gpio++) {
+        if (rtc_gpio_is_valid_gpio(gpio)) {
+            rtcio_hal_clear_edge_wakeup_intr_status(rtc_io_number_get(gpio));
+        }
+    }
+}
+#endif
 
 esp_err_t esp_sleep_enable_gpio_wakeup(void)
 {

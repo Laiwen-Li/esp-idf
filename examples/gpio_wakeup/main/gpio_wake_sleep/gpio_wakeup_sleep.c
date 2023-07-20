@@ -10,20 +10,42 @@
 #include "esp_check.h"
 #include "esp_sleep.h"
 #include "driver/gpio.h"
+#include "driver/rtc_io.h"
+#include "driver/gpio_filter.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <unistd.h>
 #include "gpio_wakeup_example.h"
 
-/* gpio pin for wake-up and sleep */
-#define DEFAULT_GPIO_WAKEUP_SLEEP_NUM   	  (CONFIG_EXAMPLE_GPIO_WAKEUP_SLEEP_NUM)
+#define LOW_LEVEL_WAKEUP    (0)
+#define HIGH_LEVEL_WAKEUP   (1)
+#define NEGEDGE_WAKEUP      (2)
+#define POSEDGE_WAKEUP      (3)
 
-/* Setting the level for wakeup */
-#if CONFIG_EXAMPLE_GPIO_WAKEUP_HIGH_LEVEL
-#define DEFAULT_GPIO_WAKEUP_LEVEL       	  (1)
+/* gpio pin for wake-up and sleep */
+#define DEFAULT_GPIO_WAKEUP_SLEEP_NUM   (CONFIG_EXAMPLE_GPIO_WAKEUP_SLEEP_NUM)
+
+/* set gpio wakeup mode */
+#if CONFIG_EXAMPLE_GPIO_WAKEUP_EDGE_MODE && CONFIG_IDF_TARGET_ESP32C6
+#if CONFIG_EXAMPLE_GPIO_WAKEUP_POS_EDGE
+#define DEFAULT_GPIO_WAKEUP_MODE    POSEDGE_WAKEUP
 #else
-#define DEFAULT_GPIO_WAKEUP_LEVEL       	  (0)
+#define DEFAULT_GPIO_WAKEUP_MODE    NEGEDGE_WAKEUP
 #endif
+#else
+#if CONFIG_EXAMPLE_GPIO_WAKEUP_HIGH_LEVEL
+#define DEFAULT_GPIO_WAKEUP_MODE    HIGH_LEVEL_WAKEUP
+#else
+#define DEFAULT_GPIO_WAKEUP_MODE    LOW_LEVEL_WAKEUP
+#endif
+#endif
+
+// /* Setting the level for wakeup */
+// #if CONFIG_EXAMPLE_GPIO_WAKEUP_HIGH_LEVEL
+// #define DEFAULT_GPIO_WAKEUP_LEVEL       	  (1)
+// #else
+// #define DEFAULT_GPIO_WAKEUP_LEVEL       	  (0)
+// #endif
 
 /* whether to use internal pull up and pull down */
 #if CONFIG_EXAMPLE_USE_INTERNAL_PU_PD
@@ -41,23 +63,45 @@
 /* Set the priority of a task */
 #define DEFAULT_EVENT_TASK_PRIORITY           (CONFIG_EXAMPLE_EVENT_TASK_PRIORITY)
 
-
 /* acquire lock and release lock interrupt trigger type */
-#if DEFAULT_GPIO_WAKEUP_LEVEL
-#define TO_ACTIVE_INTR_TYPE			  		  (GPIO_INTR_HIGH_LEVEL)
-#define TO_SLEEP_INTR_TYPE					  (GPIO_INTR_LOW_LEVEL)
-#else
+#if (DEFAULT_GPIO_WAKEUP_MODE == LOW_LEVEL_WAKEUP)
 #define TO_ACTIVE_INTR_TYPE			  		  (GPIO_INTR_LOW_LEVEL)
 #define TO_SLEEP_INTR_TYPE					  (GPIO_INTR_HIGH_LEVEL)
+#elif (DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP) 
+#define TO_ACTIVE_INTR_TYPE			  		  (GPIO_INTR_HIGH_LEVEL)
+#define TO_SLEEP_INTR_TYPE					  (GPIO_INTR_LOW_LEVEL)
+#elif (DEFAULT_GPIO_WAKEUP_MODE == NEGEDGE_WAKEUP)
+#define TO_ACTIVE_INTR_TYPE			  		  (GPIO_INTR_NEGEDGE)
+#define TO_SLEEP_INTR_TYPE					  (GPIO_INTR_POSEDGE)
+#else
+#define TO_ACTIVE_INTR_TYPE			  		  (GPIO_INTR_POSEDGE)
+#define TO_SLEEP_INTR_TYPE					  (GPIO_INTR_NEGEDGE)
 #endif
 
+#if DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP || DEFAULT_GPIO_WAKEUP_MODE == POSEDGE_WAKEUP
+#define WAIT_IO_LEVEL                         (1)
+#else
+#define WAIT_IO_LEVEL                         (0)
+#endif
+
+#if DEFAULT_GPIO_WAKEUP_MODE == LOW_LEVEL_WAKEUP
+#define WAKEUP_INTR_TYPE                      GPIO_INTR_LOW_LEVEL
+#elif DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP
+#define WAKEUP_INTR_TYPE                      GPIO_INTR_HIGH_LEVEL
+#elif DEFAULT_GPIO_WAKEUP_MODE == NEGEDGE_WAKEUP
+#define WAKEUP_INTR_TYPE                      GPIO_INTR_NEGEDGE
+#else
+#define WAKEUP_INTR_TYPE                      GPIO_INTR_POSEDGE
+#endif
 
 #define ESP_INTR_FLAG_DEFAULT                 (0)
 
 /* Types of events that task can handle */
 typedef enum {
-	PM_LOCK_EVENT_ACQUIRE = 0,
-	PM_LOCK_EVENT_RELEASE = 1
+    GPIO_INIT_EVENT_LEVEL_WAKEUP = 0,
+    GPIO_INIT_EVENT_EDGE_WAKEUP,
+	PM_LOCK_EVENT_ACQUIRE,
+	PM_LOCK_EVENT_RELEASE
 } task_event_t;
 
 /* message passed to task by interrupt function */
@@ -71,19 +115,24 @@ static const char *TAG = "gpio_wakeup_sleep";
 /* interrupt function have two tasks：
 1. modify interrupt trigger types
 2. notify task to work */
-static void IRAM_ATTR gpio_isr_handler(void* arg)
+static void IRAM_ATTR gpio_isr_handler(void* args)
 {
-    gpio_ws_t* gpio_ws = (gpio_ws_t*)arg; 
+    gpio_ws_t* object = (gpio_ws_t*)args; 
     // 1. The first thing to do is to change the trigger
     // Documentation describes why: why diable intr, why modify intr type
-    ESP_ERROR_CHECK(gpio_intr_disable(DEFAULT_GPIO_WAKEUP_SLEEP_NUM));
-    ESP_ERROR_CHECK(gpio_set_intr_type(DEFAULT_GPIO_WAKEUP_SLEEP_NUM, 
-                gpio_ws->hold_lock_state == HOLD_LOCK_STATE ? TO_ACTIVE_INTR_TYPE : TO_SLEEP_INTR_TYPE));
+#if !(CONFIG_EXAMPLE_GPIO_WAKEUP_EDGE_MODE && CONFIG_IDF_TARGET_ESP32C6)
+    ESP_ERROR_CHECK(gpio_intr_disable(object->gpio));
+    ESP_ERROR_CHECK(gpio_set_intr_type(object->gpio, 
+                object->hold_lock_state == HOLD_LOCK_STATE ? TO_ACTIVE_INTR_TYPE : TO_SLEEP_INTR_TYPE));
+#endif
+    esp_rom_printf("lock state:%d\n", object->hold_lock_state);
     
     msg_t send_task_msg = {
-        .event = (gpio_ws->hold_lock_state == HOLD_LOCK_STATE) ? PM_LOCK_EVENT_RELEASE : PM_LOCK_EVENT_ACQUIRE
+        .event = (object->hold_lock_state == HOLD_LOCK_STATE) ? PM_LOCK_EVENT_RELEASE : PM_LOCK_EVENT_ACQUIRE
     };
-    xQueueSendFromISR(gpio_ws->evt_queue, &send_task_msg, NULL);
+    if (gpio_get_level(object->gpio) == (object->hold_lock_state == HOLD_LOCK_STATE)) {
+        xQueueSendFromISR(object->evt_queue, (void *)&send_task_msg, NULL);
+    }
     
     // An output pin can be added for easy viewing on the ammeter
 
@@ -91,32 +140,108 @@ static void IRAM_ATTR gpio_isr_handler(void* arg)
 }
 
 /* Tasks for handling events */
-static void example_event_task(void* arg)
+static void example_event_task(void* args)
 {
-    gpio_ws_t* gpio_ws = (gpio_ws_t*)arg; 
+    gpio_ws_t* object = (gpio_ws_t*)args; 
     msg_t recv_isr_msg;
-    while (xQueueReceive(gpio_ws->evt_queue, &recv_isr_msg, portMAX_DELAY)) {
+
+    // create a queue to handle event from isr
+    object->evt_queue = xQueueCreate(DEFAULT_EVENT_QUEUE_LEN, sizeof(msg_t));
+    if(!(object->evt_queue)) {
+        ESP_LOGE(TAG, "create event queue failed");
+        return;
+    }
+
+#if CONFIG_EXAMPLE_GPIO_WAKEUP_EDGE_MODE && CONFIG_IDF_TARGET_ESP32C6
+    recv_isr_msg.event = GPIO_INIT_EVENT_EDGE_WAKEUP;
+#else
+    recv_isr_msg.event = GPIO_INIT_EVENT_LEVEL_WAKEUP;
+#endif
+    if (pdFALSE == xQueueSend(object->evt_queue, (void *)&recv_isr_msg, 0)) {
+        ESP_LOGE(TAG, "%s:%d %s::%s send auto light sleep init event failed!",__FILE__, __LINE__, pcTaskGetName(NULL), __func__);
+        return;
+    }
+
+    while (xQueueReceive(object->evt_queue, (void *)&recv_isr_msg, portMAX_DELAY)) {
         switch (recv_isr_msg.event)
         {
+        case GPIO_INIT_EVENT_LEVEL_WAKEUP:
+            // Set low level wakeup first, then set gpio intr type 
+            // (due to a hardware defect that makes it necessary to DEFAULT_GPIO_WAKEUP_SLEEP_NUM gpio intr type later)
+            ESP_ERROR_CHECK( gpio_wakeup_enable(object->gpio, WAKEUP_INTR_TYPE) );
+
+            ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, TO_SLEEP_INTR_TYPE) );
+            esp_rom_printf( "set gpio[%d] wakeup mode: %d,\t intr type: %d\n", object->gpio, WAKEUP_INTR_TYPE, TO_SLEEP_INTR_TYPE );
+            // install gpio isr service
+            ESP_ERROR_CHECK( gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT) );
+            // hook isr handler for specific gpio pin 
+            ESP_ERROR_CHECK( gpio_isr_handler_add(object->gpio, gpio_isr_handler, (void *)object) );
+            ESP_ERROR_CHECK( gpio_intr_enable(object->gpio) );
+            ESP_LOGI(TAG, "gpio interrupt is ready");
+
+            // enable gpio wake-up
+            ESP_ERROR_CHECK( esp_sleep_enable_gpio_wakeup() );
+            ESP_LOGI(TAG, "enable gpio wakeup");
+            break;
+
+        case GPIO_INIT_EVENT_EDGE_WAKEUP:
+            /* Initialize LPIO */
+            ESP_ERROR_CHECK( rtc_gpio_init(object->gpio) );
+            ESP_ERROR_CHECK( rtc_gpio_set_direction(object->gpio, RTC_GPIO_MODE_INPUT_ONLY) );
+#if !DEFAULT_USE_INTERNAL_PU_PD
+            ESP_ERROR_CHECK( rtc_gpio_pullup_dis(object->gpio) );
+            ESP_ERROR_CHECK( rtc_gpio_pulldown_dis(object->gpio) );
+#elif (DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP) || (DEFAULT_GPIO_WAKEUP_MODE == POSEDGE_WAKEUP)
+            ESP_ERROR_CHECK( rtc_gpio_pullup_en(object->gpio) );
+            ESP_ERROR_CHECK( rtc_gpio_pulldown_dis(object->gpio) );
+#else
+            ESP_ERROR_CHECK( rtc_gpio_pullup_dis(object->gpio) );
+            ESP_ERROR_CHECK( rtc_gpio_pulldown_en(object->gpio) );
+#endif
+            /* Enable wake up from LPIO wakeup */
+            ESP_ERROR_CHECK( rtc_gpio_wakeup_enable(object->gpio, GPIO_INTR_ANYEDGE) );
+
+            ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, GPIO_INTR_ANYEDGE) );
+            esp_rom_printf( "set gpio[%d] wakeup mode: %d,\t intr type: %d\n", object->gpio, WAKEUP_INTR_TYPE, TO_SLEEP_INTR_TYPE );
+            // install gpio isr service
+            ESP_ERROR_CHECK( gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT) );
+            // hook isr handler for specific gpio pin 
+            ESP_ERROR_CHECK( gpio_isr_handler_add(object->gpio, gpio_isr_handler, (void *)object) );
+            ESP_ERROR_CHECK( gpio_intr_enable(object->gpio) );
+            ESP_LOGI(TAG, "gpio interrupt is ready");
+
+            extern void pwr_hal_clear_mac_modem_state_wakeup_protect_signal(void);
+            pwr_hal_clear_mac_modem_state_wakeup_protect_signal();
+
+            // enable gpio wake-up
+            ESP_ERROR_CHECK( esp_sleep_enable_gpio_wakeup() );
+            ESP_LOGI(TAG, "enable gpio wakeup");
+            break;
+
         case PM_LOCK_EVENT_RELEASE:// to sleep
             
-            ESP_ERROR_CHECK(esp_pm_lock_release(gpio_ws->pm_lock));
+            ESP_ERROR_CHECK( esp_pm_lock_release(object->pm_lock) );
+
+            extern void pwr_hal_clear_mac_modem_state_wakeup_protect_signal(void);
+            pwr_hal_clear_mac_modem_state_wakeup_protect_signal();
 
             //2. Change Software Status
-            gpio_ws->hold_lock_state = NO_LOCK_STATE;
-
-            ESP_ERROR_CHECK(gpio_intr_enable(DEFAULT_GPIO_WAKEUP_SLEEP_NUM));
+            object->hold_lock_state = NO_LOCK_STATE;
+#if !(CONFIG_EXAMPLE_GPIO_WAKEUP_EDGE_MODE && CONFIG_IDF_TARGET_ESP32C6)
+            ESP_ERROR_CHECK( gpio_intr_enable(object->gpio) );
+#endif
             ESP_LOGI(TAG, "release %s lock finished, system may sleep", PM_LOCK_TYPE_TO_STRING);
             break;
 
         case PM_LOCK_EVENT_ACQUIRE:// to active
             
-            ESP_ERROR_CHECK(esp_pm_lock_acquire(gpio_ws->pm_lock));
+            ESP_ERROR_CHECK( esp_pm_lock_acquire(object->pm_lock) );
 
             //2. Change Software Status
-            gpio_ws->hold_lock_state = HOLD_LOCK_STATE;
-
-            ESP_ERROR_CHECK(gpio_intr_enable(DEFAULT_GPIO_WAKEUP_SLEEP_NUM));
+            object->hold_lock_state = HOLD_LOCK_STATE;
+#if !(CONFIG_EXAMPLE_GPIO_WAKEUP_EDGE_MODE && CONFIG_IDF_TARGET_ESP32C6)
+            ESP_ERROR_CHECK( gpio_intr_enable(object->gpio) );
+#endif
             ESP_LOGI(TAG, "acquire %s lock finished, can to do something...", PM_LOCK_TYPE_TO_STRING);
             break;
 
@@ -128,69 +253,55 @@ static void example_event_task(void* arg)
     }
 }
 
-void example_wait_gpio_inactive(void)
+void example_wait_gpio_inactive(gpio_num_t gpio, bool level)
 {
-    // When init, wait for the IO port to become low level first.
-    if (gpio_get_level(DEFAULT_GPIO_WAKEUP_SLEEP_NUM) != DEFAULT_GPIO_WAKEUP_LEVEL) {
-        esp_rom_printf("Waiting for GPIO%d to go low...\n", DEFAULT_GPIO_WAKEUP_SLEEP_NUM);
+    // When init, wait for the IO port to become proper level first.
+    if (gpio_get_level(gpio) != level) {
+        esp_rom_printf("Waiting for GPIO%d to go %s...\n", gpio, (level) ? "high" : "low");
     }
-    while (gpio_get_level(DEFAULT_GPIO_WAKEUP_SLEEP_NUM) != DEFAULT_GPIO_WAKEUP_LEVEL) {
+    while (gpio_get_level(gpio) != level) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     ESP_LOGI(TAG, "gpio is ready");
 }
 
 /* Configure gpio wakeup and gpio interrupts */
-esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t* arg)
+esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t* args)
 {
-    gpio_ws_t* gpio_ws = arg;
+    gpio_ws_t* object = args;
     
     /* Initialize GPIO */
     gpio_config_t config = {
         .pin_bit_mask = BIT64(DEFAULT_GPIO_WAKEUP_SLEEP_NUM),
         .mode = GPIO_MODE_INPUT,
-        .pull_up_en = DEFAULT_USE_INTERNAL_PU_PD ? (DEFAULT_GPIO_WAKEUP_LEVEL ? true : false) : false,
-        .pull_down_en = DEFAULT_USE_INTERNAL_PU_PD ? (DEFAULT_GPIO_WAKEUP_LEVEL ? false : true) : false
+        .pull_up_en = DEFAULT_USE_INTERNAL_PU_PD ? (((DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP) || 
+                                    (DEFAULT_GPIO_WAKEUP_MODE == POSEDGE_WAKEUP)) ? true : false) : false,
+        .pull_down_en = DEFAULT_USE_INTERNAL_PU_PD ? (((DEFAULT_GPIO_WAKEUP_MODE == HIGH_LEVEL_WAKEUP) || 
+                                    (DEFAULT_GPIO_WAKEUP_MODE == POSEDGE_WAKEUP)) ? false : true) : false
     };
     ESP_RETURN_ON_ERROR(gpio_config(&config), TAG, "Initialize GPIO%d failed", DEFAULT_GPIO_WAKEUP_SLEEP_NUM);
 
-    // Make sure the GPIO is inactive and it won't trigger wakeup immediately
-    example_wait_gpio_inactive();
+    object->gpio = DEFAULT_GPIO_WAKEUP_SLEEP_NUM;
 
-    // create a queue to handle event from isr
-    gpio_ws->evt_queue = xQueueCreate(DEFAULT_EVENT_QUEUE_LEN, sizeof(msg_t));
-    if((gpio_ws->evt_queue) == NULL) {
-        ESP_LOGE(TAG, "create event queue failed");
-        return ESP_FAIL;
-    }
+    // // Set GPIO flex glitch filter
+    // gpio_flex_glitch_filter_config_t fg_config = {
+    //     .gpio_num = object->gpio,
+    //     .clk_src = GLITCH_FILTER_CLK_SRC_DEFAULT,
+    //     .window_width_ns = 700,
+    //     .window_thres_ns = 700
+    // };
+    // gpio_new_flex_glitch_filter(&fg_config, &(object->flex_glitch_filter));
+    // gpio_glitch_filter_enable(object->flex_glitch_filter);
+
+    // Make sure the GPIO is inactive and it won't trigger wakeup immediately
+    example_wait_gpio_inactive(object->gpio, WAIT_IO_LEVEL);
 
     // Create a task for handling events
-    if(pdPASS != xTaskCreate(example_event_task, "example_event_task", DEFAULT_EVENT_TASK_STACK_SIZE, gpio_ws, DEFAULT_EVENT_TASK_PRIORITY, gpio_ws->event_task)) {
-        // release queue
-        vQueueDelete(gpio_ws->evt_queue);
-        gpio_ws->evt_queue = NULL;
+    if(pdPASS != xTaskCreate(example_event_task, "example_event_task", DEFAULT_EVENT_TASK_STACK_SIZE, (void *)object, DEFAULT_EVENT_TASK_PRIORITY, object->event_task)) {
         ESP_LOGE(TAG, "create event task failed");
         return ESP_FAIL;
     }
     ESP_LOGI(TAG, "gpio task is ready");
-
-    // enable gpio wake-up
-    ESP_RETURN_ON_ERROR(esp_sleep_enable_gpio_wakeup(), TAG, "Enable GPIO%d wakeup failed", DEFAULT_GPIO_WAKEUP_SLEEP_NUM);
-    ESP_LOGI(TAG, "enable gpio wakeup");
-
-    // Set low level wakeup first, then set gpio intr type 
-    // (due to a hardware defect that makes it necessary to DEFAULT_GPIO_WAKEUP_SLEEP_NUM gpio intr type later)
-    ESP_RETURN_ON_ERROR(gpio_wakeup_enable(DEFAULT_GPIO_WAKEUP_SLEEP_NUM, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ? 
-                            GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL), TAG, "set gpio[%d] wake-up level failed", DEFAULT_GPIO_WAKEUP_SLEEP_NUM);
-    ESP_RETURN_ON_ERROR(gpio_set_intr_type(DEFAULT_GPIO_WAKEUP_SLEEP_NUM, TO_SLEEP_INTR_TYPE), 
-                            TAG, "set gpio[%d] intr failed", DEFAULT_GPIO_WAKEUP_SLEEP_NUM);
-
-    // install gpio isr service
-    ESP_RETURN_ON_ERROR(gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT), TAG, "install isr failed");
-
-    // hook isr handler for specific gpio pin 
-    ESP_RETURN_ON_ERROR(gpio_isr_handler_add(DEFAULT_GPIO_WAKEUP_SLEEP_NUM, gpio_isr_handler, gpio_ws), TAG, "add isr for specific gpio pin failed");
-    ESP_LOGI(TAG, "gpio interrupt is ready");
 
     return ESP_OK;
 }

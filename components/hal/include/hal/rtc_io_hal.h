@@ -244,6 +244,15 @@ void rtcio_hal_set_direction_in_sleep(int rtcio_num, rtc_gpio_mode_t mode);
  */
 #define rtcio_hal_ext0_set_wakeup_pin(rtcio_num, level)     rtcio_ll_ext0_set_wakeup_pin(rtcio_num, level)
 
+#if SOC_RTCIO_EDGE_WAKE_SUPPORTED
+/**
+ * Clear the RTC IO edge-triggered wake-up interrupt status.
+ *
+ * @param rtcio_num The index of rtcio. 0 ~ MAX(rtcio).
+ */
+#define rtcio_hal_clear_edge_wakeup_intr_status(rtcio_num)  rtcio_ll_clear_edge_wakeup_intr_status(rtcio_num)
+#endif
+
 #endif
 
 #if SOC_RTCIO_HOLD_SUPPORTED && SOC_RTCIO_INPUT_OUTPUT_SUPPORTED

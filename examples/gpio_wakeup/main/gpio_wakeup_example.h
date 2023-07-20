@@ -8,6 +8,7 @@
 #include "esp_pm.h"
 #include "esp_check.h"
 #include "driver/gpio.h"
+#include "driver/gpio_filter.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -33,6 +34,10 @@ typedef enum{
 
 /* important properties of gpio wake-up example */
 typedef struct {
+	// io pin num
+	gpio_num_t gpio;
+	// filter handle
+	gpio_glitch_filter_handle_t flex_glitch_filter;
 	// system hold lock state
 	hold_pm_lock_state_t hold_lock_state;
 	// pm lock handle
@@ -48,8 +53,8 @@ typedef struct {
 extern "C" {
 #endif
 
-esp_err_t power_config(gpio_ws_t* arg);
-esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t* arg);
+esp_err_t power_config(gpio_ws_t*);
+esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t*);
 
 #ifdef __cplusplus
 }

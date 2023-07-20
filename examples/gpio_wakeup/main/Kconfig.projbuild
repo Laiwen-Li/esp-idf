@@ -4,7 +4,8 @@ menu "Example Configuration"
 
         config EXAMPLE_GPIO_WAKEUP_SLEEP_NUM
             int "Enable wakeup from GPIO"
-            default 6  if IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+            default 7  if IDF_TARGET_ESP32C6
+            default 6  if IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2
             default 5  if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32H2
             default 4  if IDF_TARGET_ESP32
             default 0
@@ -12,8 +13,21 @@ menu "Example Configuration"
             help
                 This option is used to set the wakeup and sleep pin.
 
+        config EXAMPLE_GPIO_WAKEUP_EDGE_MODE
+            bool "set gpio wakeup edge mode" if IDF_TARGET_ESP32C6
+            default n
+            help
+                This option set the gpio wake-up mode. If this option is enabled, it is a edge wakeup, otherwise it is a level wakeup.
+        
+        config EXAMPLE_GPIO_WAKEUP_POS_EDGE
+            bool "Enable GPIO posedge wakeup" if IDF_TARGET_ESP32C6 && EXAMPLE_GPIO_WAKEUP_EDGE_MODE
+            default n
+            help
+                This option set the gpio wake-up trigger signal, In light sleep, only high or low level wake-up is
+                supported. If this option is enabled, it is a high level wake up, otherwise it is a low level wake up.
+        
         config EXAMPLE_GPIO_WAKEUP_HIGH_LEVEL
-            bool "Enable GPIO high-level wakeup"
+            bool "Enable GPIO high-level wakeup" if !EXAMPLE_GPIO_WAKEUP_EDGE_MODE
             default n
             help
                 This option set the gpio wake-up trigger signal, In light sleep, only high or low level wake-up is

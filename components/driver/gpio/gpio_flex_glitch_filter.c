@@ -150,6 +150,7 @@ esp_err_t gpio_new_flex_glitch_filter(const gpio_flex_glitch_filter_config_t *co
 
     uint32_t window_thres_ticks = clk_freq_hz / 1000000 * config->window_thres_ns / 1000;
     uint32_t window_width_ticks = clk_freq_hz / 1000000 * config->window_width_ns / 1000;
+    esp_rom_printf("window_thres_ticks: %d, window_width_ticks: %d\n", window_thres_ticks, window_width_ticks);
     ESP_GOTO_ON_FALSE(window_thres_ticks && window_thres_ticks <= window_width_ticks && window_width_ticks <= GPIO_LL_GLITCH_FILTER_MAX_WINDOW,
                       ESP_ERR_INVALID_ARG, err, TAG, "invalid or out of range window width/threshold");
 
