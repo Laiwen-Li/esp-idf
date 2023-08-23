@@ -34,7 +34,7 @@ repos:
       - id: flake8
         args: ['--config=.flake8', '--tee', '--benchmark']
   - repo: https://github.com/pycqa/isort
-    rev: 5.11.5  # python 3.7 compatible
+    rev: 5.12.0  # python 3.8 compatible
     hooks:
       - id: isort
         name: isort (python)
@@ -152,12 +152,27 @@ repos:
         additional_dependencies:
           - PyYAML == 5.3.1
           - ruamel.yaml
+      - id: check-build-test-rules-path-exists
+        name: check path in .build-test-rules.yml exists
+        entry: tools/ci/check_build_test_rules.py check-exist
+        language: python
+        additional_dependencies:
+          - PyYAML == 5.3.1
+        always_run: true
+        pass_filenames: false
+        require_serial: true
       - id: submodule-sbom-hash-check
         name: Check if sbom-hash values for submodules in .gitmodules match submodules checkout hash in git tree
         entry: python tools/test_sbom/test_submodules.py
         language: python
         always_run: true
         pass_filenames: false
+      - id: cleanup-ignore-lists
+        name: Remove non-existing patterns from ignore lists
+        entry: tools/ci/cleanup_ignore_lists.py
+        language: python
+        always_run: true
+        require_serial: true
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.0.1
     hooks:

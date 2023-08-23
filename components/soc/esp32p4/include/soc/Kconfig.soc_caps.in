@@ -23,6 +23,18 @@ config SOC_GPTIMER_SUPPORTED
     bool
     default y
 
+config SOC_PCNT_SUPPORTED
+    bool
+    default y
+
+config SOC_MCPWM_SUPPORTED
+    bool
+    default y
+
+config SOC_ASYNC_MEMCPY_SUPPORTED
+    bool
+    default y
+
 config SOC_SUPPORTS_SECURE_DL_MODE
     bool
     default y
@@ -39,7 +51,23 @@ config SOC_RTC_MEM_SUPPORTED
     bool
     default y
 
+config SOC_I2C_SUPPORTED
+    bool
+    default y
+
 config SOC_SYSTIMER_SUPPORTED
+    bool
+    default y
+
+config SOC_MPI_SUPPORTED
+    bool
+    default y
+
+config SOC_ECC_SUPPORTED
+    bool
+    default y
+
+config SOC_ECC_EXTENDED_MODES_SUPPORTED
     bool
     default y
 
@@ -219,6 +247,10 @@ config SOC_GDMA_PAIRS_PER_GROUP_MAX
     int
     default 3
 
+config SOC_AXI_GDMA_SUPPORT_PSRAM
+    bool
+    default y
+
 config SOC_ETM_GROUPS
     int
     default 1
@@ -233,7 +265,11 @@ config SOC_GPIO_PORT
 
 config SOC_GPIO_PIN_COUNT
     int
-    default 64
+    default 57
+
+config SOC_GPIO_SUPPORT_PIN_HYS_FILTER
+    bool
+    default y
 
 config SOC_GPIO_ETM_EVENTS_PER_GROUP
     int
@@ -249,7 +285,7 @@ config SOC_GPIO_SUPPORT_RTC_INDEPENDENT
 
 config SOC_GPIO_VALID_GPIO_MASK
     hex
-    default 0xFFFFFFFFFFFFFFFF
+    default 0x01FFFFFFFFFFFFFF
 
 config SOC_GPIO_DEEP_SLEEP_WAKE_VALID_GPIO_MASK
     int
@@ -257,7 +293,15 @@ config SOC_GPIO_DEEP_SLEEP_WAKE_VALID_GPIO_MASK
 
 config SOC_GPIO_VALID_DIGITAL_IO_PAD_MASK
     hex
-    default 0x000000007FFFFF00
+    default 0x01FFFFFFFFFF0000
+
+config SOC_GPIO_SUPPORT_FORCE_HOLD
+    bool
+    default y
+
+config SOC_GPIO_SUPPORT_HOLD_SINGLE_IO_IN_DSLP
+    bool
+    default y
 
 config SOC_DEDIC_GPIO_OUT_CHANNELS_NUM
     int
@@ -273,11 +317,15 @@ config SOC_DEDIC_PERIPH_ALWAYS_ENABLE
 
 config SOC_I2C_NUM
     int
-    default 1
+    default 2
 
 config SOC_I2C_FIFO_LEN
     int
     default 32
+
+config SOC_I2C_CMD_REG_NUM
+    int
+    default 8
 
 config SOC_I2C_SUPPORT_SLAVE
     bool
@@ -411,6 +459,10 @@ config SOC_PCNT_SUPPORT_RUNTIME_THRES_UPDATE
     bool
     default y
 
+config SOC_PCNT_SUPPORT_ZERO_INPUT
+    bool
+    default y
+
 config SOC_RMT_GROUPS
     int
     default 1
@@ -469,7 +521,7 @@ config SOC_RMT_SUPPORT_RC_FAST
 
 config SOC_MCPWM_GROUPS
     int
-    default 1
+    default 2
 
 config SOC_MCPWM_TIMERS_PER_GROUP
     int
@@ -543,9 +595,17 @@ config SOC_PARLIO_TX_RX_SHARE_INTERRUPT
     bool
     default y
 
+config SOC_MPI_MEM_BLOCKS_NUM
+    int
+    default 4
+
+config SOC_MPI_OPERATIONS_NUM
+    int
+    default 3
+
 config SOC_RSA_MAX_BIT_LEN
     int
-    default 3072
+    default 4096
 
 config SOC_SHA_DMA_MAX_BUFFER_SIZE
     int
@@ -960,5 +1020,9 @@ config SOC_TEMPERATURE_SENSOR_SUPPORT_FAST_RC
     default y
 
 config SOC_TEMPERATURE_SENSOR_SUPPORT_XTAL
+    bool
+    default y
+
+config SOC_MEM_TCM_SUPPORTED
     bool
     default y

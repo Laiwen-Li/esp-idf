@@ -47,7 +47,6 @@ typedef enum {
     ESP_BT_STATUS_MEMORY_FULL   = 20,           /* relate to BT_STATUS_MEMORY_FULL in bt_def.h */
     ESP_BT_STATUS_EIR_TOO_LARGE,                /* relate to BT_STATUS_EIR_TOO_LARGE in bt_def.h */
     ESP_BT_STATUS_HCI_SUCCESS   = ESP_BT_STATUS_BASE_FOR_HCI_ERR,
-    ESP_BT_STATUS_HCI_PENDING,
     ESP_BT_STATUS_HCI_ILLEGAL_COMMAND,
     ESP_BT_STATUS_HCI_NO_CONNECTION,
     ESP_BT_STATUS_HCI_HW_FAILURE,
@@ -126,7 +125,11 @@ typedef uint8_t esp_link_key[ESP_BT_OCTET16_LEN];      /* Link Key */
 /// Default GATT interface id
 #define ESP_DEFAULT_GATT_IF             0xff
 
+#if BLE_HIGH_DUTY_ADV_INTERVAL
+#define ESP_BLE_PRIM_ADV_INT_MIN            0x000008     /*!< Minimum advertising interval for undirected and low duty cycle directed advertising */
+#else
 #define ESP_BLE_PRIM_ADV_INT_MIN            0x000020     /*!< Minimum advertising interval for undirected and low duty cycle directed advertising */
+#endif
 #define ESP_BLE_PRIM_ADV_INT_MAX            0xFFFFFF     /*!< Maximum advertising interval for undirected and low duty cycle directed advertising */
 #define ESP_BLE_CONN_INT_MIN                0x0006       /*!< relate to BTM_BLE_CONN_INT_MIN in stack/btm_ble_api.h */
 #define ESP_BLE_CONN_INT_MAX                0x0C80       /*!< relate to BTM_BLE_CONN_INT_MAX in stack/btm_ble_api.h */

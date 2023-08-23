@@ -65,10 +65,6 @@ Subsequent behavior of the panic handler can be set using :ref:`CONFIG_ESP_SYSTE
 
   Start GDB server which can communicate with GDB over console UART port. This option will only provide read-only debugging or post-mortem debugging. See `GDB Stub`_ for more details.
 
-- Invoke dynamic GDB Stub (``ESP_SYSTEM_GDBSTUB_RUNTIME``)
-
-  Start the GDB server which can communicate with GDB over the console UART port. This option allows the user to debug a program at run time and set breakpoints, alter the execution, etc. See `GDB Stub`_ for more details.
-
 The behavior of the panic handler is affected by three other configuration options.
 
 - If :ref:`CONFIG_ESP_DEBUG_OCDAWARE` is enabled (which is the default), the panic handler will detect whether a JTAG debugger is connected. If it is, execution will be halted and control will be passed to the debugger. In this case, registers and backtrace are not dumped to the console, and GDBStub / Core Dump functions are not used.
@@ -412,18 +408,21 @@ In some situations, ESP-IDF will temporarily disable access to external SPI Flas
 Other Fatal Errors
 ------------------
 
-Brownout
-^^^^^^^^
+.. only:: SOC_BOD_SUPPORTED
 
-{IDF_TARGET_NAME} has a built-in brownout detector, which is enabled by default. The brownout detector can trigger a system reset if the supply voltage goes below a safe level. The brownout detector can be configured using :ref:`CONFIG_ESP_BROWNOUT_DET` and :ref:`CONFIG_ESP_BROWNOUT_DET_LVL_SEL` options.
+    Brownout
+    ^^^^^^^^
 
-When the brownout detector triggers, the following message is printed::
+    {IDF_TARGET_NAME} has a built-in brownout detector, which is enabled by default. The brownout detector can trigger a system reset if the supply voltage goes below a safe level. The brownout detector can be configured using :ref:`CONFIG_ESP_BROWNOUT_DET` and :ref:`CONFIG_ESP_BROWNOUT_DET_LVL_SEL` options.
 
-    Brownout detector was triggered
+    When the brownout detector triggers, the following message is printed::
 
-The chip is reset after the message is printed.
+        Brownout detector was triggered
 
-Note that if the supply voltage is dropping at a fast rate, only part of the message may be seen on the console.
+    The chip is reset after the message is printed.
+
+    Note that if the supply voltage is dropping at a fast rate, only part of the message may be seen on the console.
+
 
 Corrupt Heap
 ^^^^^^^^^^^^

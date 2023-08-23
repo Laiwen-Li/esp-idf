@@ -198,6 +198,12 @@
 #define BLE_FEAT_PERIODIC_ADV_SYNC_TRANSFER   FALSE
 #endif
 
+#if (UC_BT_BLE_HIGH_DUTY_ADV_INTERVAL == TRUE)
+#define BLE_HIGH_DUTY_ADV_INTERVAL TRUE
+#else
+#define BLE_HIGH_DUTY_ADV_INTERVAL FALSE
+#endif
+
 #if (UC_BT_BLE_RPA_SUPPORTED  == TRUE)
 #define CONTROLLER_RPA_LIST_ENABLE   TRUE
 #else
@@ -1510,7 +1516,7 @@
 
 /* The maximum number of simultaneous client and server connections. */
 #ifndef SDP_MAX_CONNECTIONS
-#define SDP_MAX_CONNECTIONS         2 // 4
+#define SDP_MAX_CONNECTIONS         4
 #endif
 
 /* The MTU size for the L2CAP configuration. */

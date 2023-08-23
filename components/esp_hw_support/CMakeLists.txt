@@ -60,16 +60,18 @@ if(NOT BOOTLOADER_BUILD)
     endif()
 
     if(CONFIG_SOC_GDMA_SUPPORTED)
-        list(APPEND srcs "dma/gdma.c" "dma/async_memcpy_impl_gdma.c")
-    endif()
-
-    if(CONFIG_SOC_CP_DMA_SUPPORTED)
-        list(APPEND srcs "dma/async_memcpy_impl_cp_dma.c")
+        list(APPEND srcs "dma/gdma.c")
     endif()
 
     if(CONFIG_SOC_ASYNC_MEMCPY_SUPPORTED)
         list(APPEND srcs "dma/esp_async_memcpy.c")
-    endif()
+        if(CONFIG_SOC_GDMA_SUPPORTED)
+            list(APPEND srcs "dma/async_memcpy_gdma.c")
+        endif() # CONFIG_SOC_GDMA_SUPPORTED
+        if(CONFIG_SOC_CP_DMA_SUPPORTED)
+            list(APPEND srcs "dma/async_memcpy_cp_dma.c")
+        endif() # CONFIG_SOC_CP_DMA_SUPPORTED
+    endif() # CONFIG_SOC_ASYNC_MEMCPY_SUPPORTED
 
     if(CONFIG_SOC_GDMA_SUPPORT_ETM)
         list(APPEND srcs "dma/gdma_etm.c")
@@ -121,6 +123,16 @@ if(NOT BOOTLOADER_BUILD)
 
     if(CONFIG_SOC_RTC_FAST_MEM_SUPPORTED)
         list(APPEND srcs "sleep_wake_stub.c")
+    endif()
+
+    if(CONFIG_IDF_TARGET_ESP32P4)
+        list(REMOVE_ITEM srcs
+                "sleep_cpu.c"         # TODO: IDF-7528, IDF-7529
+                "sleep_modes.c"       # TODO: IDF-7528, IDF-7529
+                "sleep_wake_stub.c"   # TODO: IDF-7529
+                "sleep_gpio.c"        # TODO: IDF-7528, IDF-7529
+                "port/esp_clk_tree_common.c"    # TODO: IDF-7526
+            )
     endif()
 else()
     # Requires "_esp_error_check_failed()" function
