@@ -270,6 +270,17 @@ esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t* args)
     gpio_set_level(15, 1);
     //gpio_sleep_sel_dis(15);
 
+    // for test
+    gpio_config_t io_config = {
+        .pin_bit_mask = BIT64(15),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = false,
+        .pull_down_en = false
+    };
+    ESP_ERROR_CHECK( gpio_config(&io_config) );
+    gpio_set_level(15, 1);
+    //gpio_sleep_sel_dis(15);
+
     // Create a task for handling events
     if(pdPASS != xTaskCreate(example_event_task, "example_event_task", DEFAULT_EVENT_TASK_STACK_SIZE,
                                     (void *)object, DEFAULT_EVENT_TASK_PRIORITY, object->event_task)) {

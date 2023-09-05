@@ -296,11 +296,14 @@ bool pmu_sleep_finish(void)
 }
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 void pmu_sleep_enable_hp_sleep_sysclk(bool enable)
 {
     pmu_ll_hp_set_icg_sysclk_enable(PMU_instance()->hal->dev, HP(SLEEP), enable);
 }
 =======
+=======
+>>>>>>> Stashed changes
 uint32_t pmu_sleep_get_wakeup_cause(void)
 {
     return pmu_ll_hp_get_wakeup_cause(PMU_instance()->hal->dev);
@@ -309,5 +312,9 @@ uint32_t pmu_sleep_get_wakeup_cause(void)
 uint32_t pmu_sleep_get_reject_cause(void)
 {
     return pmu_ll_hp_get_reject_cause(PMU_instance()->hal->dev);
+<<<<<<< Updated upstream
+}
+>>>>>>> Stashed changes
+=======
 }
 >>>>>>> Stashed changes
