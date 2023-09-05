@@ -816,6 +816,9 @@ static esp_err_t IRAM_ATTR esp_sleep_start(uint32_t pd_flags, esp_sleep_mode_t m
 
     // re-enable UART output
     resume_uarts();
+    extern uint32_t pmu_sleep_get_wakeup_cause(void);
+    extern uint32_t pmu_sleep_get_reject_cause(void);
+    //esp_rom_printf(DRAM_STR("w:%d, r:%d\n"), pmu_sleep_get_wakeup_cause(), pmu_sleep_get_reject_cause());
     s_lightsleep_cnt++;
     return result ? ESP_ERR_SLEEP_REJECT : ESP_OK;
 }

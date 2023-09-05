@@ -638,6 +638,10 @@ void IRAM_ATTR vApplicationSleep( TickType_t xExpectedIdleTime )
             int64_t slept_us = esp_timer_get_time() - sleep_start;
             ESP_PM_TRACE_EXIT(SLEEP, core_id);
 
+            extern uint32_t pmu_sleep_get_wakeup_cause(void);
+            extern uint32_t pmu_sleep_get_reject_cause(void);
+            //esp_rom_printf(DRAM_STR("w:%d, r:%d\n"), pmu_sleep_get_wakeup_cause(), pmu_sleep_get_reject_cause());
+
             uint32_t slept_ticks = slept_us / (portTICK_PERIOD_MS * 1000LL);
             if (slept_ticks > 0) {
                 /* Adjust RTOS tick count based on the amount of time spent in sleep */

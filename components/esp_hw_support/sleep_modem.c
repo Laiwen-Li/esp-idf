@@ -285,9 +285,7 @@ bool modem_domain_pd_allowed(void)
                                                 SLEEP_RETENTION_MODULE_BT_BB);
     const uint32_t mask_154 = (const uint32_t) (SLEEP_RETENTION_MODULE_802154_MAC |
                                                 SLEEP_RETENTION_MODULE_BT_BB);
-    return (((modules & mask_wifi) == mask_wifi) ||
-            ((modules & mask_ble)  == mask_ble) ||
-            ((modules & mask_154)  == mask_154));
+    return true;
 #else
     return false; /* MODEM power domain is controlled by each module (WiFi, Bluetooth or 15.4) of modem */
 #endif

@@ -94,7 +94,7 @@ void example_wait_gpio_inactive(gpio_num_t gpio, bool level)
 2. notify task to work */
 static void IRAM_ATTR gpio_isr_handler(void* args)
 {
-    gpio_ws_t* object = (gpio_ws_t*)args; 
+    gpio_ws_t* object = (gpio_ws_t*)args;
     msg_t send_task_msg;
 
     // 1. The first step is to disable intr
@@ -102,7 +102,7 @@ static void IRAM_ATTR gpio_isr_handler(void* args)
     ESP_ERROR_CHECK( gpio_intr_disable(object->gpio) );
 #if !DEFAULT_USE_PULSE_WAKEUP
     // If it's a level wakeup, there's also changing the interrupt trigger method
-    ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, 
+    ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio,
                 object->hold_lock_state == HOLD_LOCK_STATE ? TO_ACTIVE_INTR_TYPE : TO_SLEEP_INTR_TYPE) );
 #endif
 
@@ -113,7 +113,7 @@ static void IRAM_ATTR gpio_isr_handler(void* args)
     send_task_msg.event = CHECK_EVENT_LEVEL;
 #endif
     xQueueSendFromISR(object->evt_queue, (void *)&send_task_msg, NULL);
-    
+
     // An output pin can be added for easy viewing on the ammeter
 
     // Is it possible to enable intr here?
@@ -122,7 +122,7 @@ static void IRAM_ATTR gpio_isr_handler(void* args)
 /* Tasks for handling events */
 static void example_event_task(void* args)
 {
-    gpio_ws_t* object = (gpio_ws_t*)args; 
+    gpio_ws_t* object = (gpio_ws_t*)args;
     msg_t recv_isr_msg, send_msg;
 
     // create a queue to handle event from isr
@@ -159,15 +159,15 @@ static void example_event_task(void* args)
             // Make sure the GPIO is inactive and it won't trigger wakeup immediately
             example_wait_gpio_inactive(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL);
 
-            // Set level wakeup first, then set gpio intr type 
+            // Set level wakeup first, then set gpio intr type
             // (due to a hardware defect that makes it necessary to DEFAULT_GPIO_WAKEUP_SLEEP_NUM gpio intr type later)
-            ESP_ERROR_CHECK( gpio_wakeup_enable(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ? 
+            ESP_ERROR_CHECK( gpio_wakeup_enable(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ?
                                     GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL) );
 
             ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, TO_SLEEP_INTR_TYPE) );
             // install gpio isr service
             ESP_ERROR_CHECK( gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT) );
-            // hook isr handler for specific gpio pin 
+            // hook isr handler for specific gpio pin
             ESP_ERROR_CHECK( gpio_isr_handler_add(object->gpio, gpio_isr_handler, (void *)object) );
             // enable gpio intr
             ESP_ERROR_CHECK( gpio_intr_enable(object->gpio) );
@@ -192,10 +192,10 @@ static void example_event_task(void* args)
             example_wait_gpio_inactive( object->gpio, (!DEFAULT_GPIO_WAKEUP_LEVEL) );
 
             // Set level wakeup first, then set gpio intr type
-            ESP_ERROR_CHECK( gpio_wakeup_enable(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ? 
+            ESP_ERROR_CHECK( gpio_wakeup_enable(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ?
                                     GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL) );
 
-            ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ? 
+            ESP_ERROR_CHECK( gpio_set_intr_type(object->gpio, DEFAULT_GPIO_WAKEUP_LEVEL == 0 ?
                                     GPIO_INTR_LOW_LEVEL : GPIO_INTR_HIGH_LEVEL) );
             // install gpio isr service
             ESP_ERROR_CHECK( gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT) );
@@ -259,8 +259,19 @@ esp_err_t example_register_gpio_wakeup_sleep(gpio_ws_t* args)
     gpio_ws_t* object = args;
     object->gpio = DEFAULT_GPIO_WAKEUP_SLEEP_NUM;
 
+    // for test
+    gpio_config_t io_config = {
+        .pin_bit_mask = BIT64(15),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = false,
+        .pull_down_en = false
+    };
+    ESP_ERROR_CHECK( gpio_config(&io_config) );
+    gpio_set_level(15, 1);
+    //gpio_sleep_sel_dis(15);
+
     // Create a task for handling events
-    if(pdPASS != xTaskCreate(example_event_task, "example_event_task", DEFAULT_EVENT_TASK_STACK_SIZE, 
+    if(pdPASS != xTaskCreate(example_event_task, "example_event_task", DEFAULT_EVENT_TASK_STACK_SIZE,
                                     (void *)object, DEFAULT_EVENT_TASK_PRIORITY, object->event_task)) {
         ESP_LOGE(TAG, "%s:%d %s::%s create event task failed!", __FILE__, __LINE__, pcTaskGetName(NULL), __func__);
         return ESP_FAIL;
